@@ -176,7 +176,7 @@
             color: #667eea;
         }
 
-        /* Processing indicator */
+        /* Processing indicator with pulse animation */
         .processing-indicator {
             position: absolute;
             top: 20px;
@@ -188,10 +188,22 @@
             align-items: center;
             gap: 10px;
             z-index: 100;
+            animation: pulse 2s infinite;
         }
 
         .processing-indicator.active {
             display: flex;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                box-shadow: 0 0 20px rgba(102, 126, 234, 0.5);
+                transform: scale(1);
+            }
+            50% {
+                box-shadow: 0 0 40px rgba(102, 126, 234, 0.8);
+                transform: scale(1.02);
+            }
         }
 
         .spinner {
@@ -393,7 +405,10 @@
         let totalWords = 0;
         let mapCount = 0;
         let currentBrainMap = null;
+        let previousBrainMap = null;
         let nv = null;  // NiiVue instance
+        let isTransitioning = false;
+        let currentVolumeIndex = 1;  // Track which volume slot to use
         const MIN_WORDS_FOR_BRAIN = 30;
 
         // ===== NIIVUE SETUP =====
@@ -426,6 +441,136 @@
                 console.log('NiiVue initialized with brain template');
             } catch (e) {
                 console.error('Error loading brain template:', e);
+            }
+        }
+
+        // ===== MORPHING TRANSITION =====
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function morphBrainStates(newMapUrl) {
+            if (isTransitioning) {
+                console.log('[MORPH] Already transitioning, queueing...');
+                return;
+            }
+
+            isTransitioning = true;
+
+            console.log('[MORPH] ==========================================');
+            console.log('[MORPH] Morphing between brain states');
+            console.log('[MORPH] Current:', currentBrainMap || 'none');
+            console.log('[MORPH] New:', newMapUrl);
+
+            try {
+                if (!currentBrainMap || nv.volumes.length < 2) {
+                    // First brain map - just load normally
+                    console.log('[MORPH] First map, loading directly');
+
+                    await nv.loadVolumes([
+                        {
+                            url: '/mni152_t1_2mm.nii.gz',
+                            colormap: 'gray',
+                            opacity: 0.15,
+                            visible: true
+                        },
+                        {
+                            url: newMapUrl,
+                            colormap: 'hot',
+                            opacity: 0.9,
+                            visible: true
+                        }
+                    ]);
+
+                    currentBrainMap = newMapUrl;
+
+                } else {
+                    // Fade out current brain map first
+                    console.log('[MORPH] Starting fade out of current map');
+
+                    const fadeSteps = 20;
+                    const fadeDuration = 600;
+                    const stepDuration = fadeDuration / fadeSteps;
+
+                    // Fade out current
+                    for (let i = fadeSteps; i >= 0; i--) {
+                        const opacity = (i / fadeSteps) * 0.9;
+                        if (nv.volumes.length > 1) {
+                            nv.setOpacity(1, opacity);
+                            nv.drawScene();
+                        }
+
+                        if (i === fadeSteps || i === Math.floor(fadeSteps/2) || i === 0) {
+                            console.log(`[MORPH] Fade out: ${Math.round((fadeSteps - i) / fadeSteps * 100)}% | Opacity: ${opacity.toFixed(2)}`);
+                        }
+
+                        await sleep(stepDuration);
+                    }
+
+                    // Now load new brain map and fade it in
+                    console.log('[MORPH] Loading new map and fading in');
+
+                    await nv.loadVolumes([
+                        {
+                            url: '/mni152_t1_2mm.nii.gz',
+                            colormap: 'gray',
+                            opacity: 0.15,
+                            visible: true
+                        },
+                        {
+                            url: newMapUrl,
+                            colormap: 'hot',
+                            opacity: 0,  // Start at 0
+                            visible: true
+                        }
+                    ]);
+
+                    // Fade in new
+                    for (let i = 0; i <= fadeSteps; i++) {
+                        const opacity = (i / fadeSteps) * 0.9;
+                        if (nv.volumes.length > 1) {
+                            nv.setOpacity(1, opacity);
+                            nv.drawScene();
+                        }
+
+                        if (i === 0 || i === Math.floor(fadeSteps/2) || i === fadeSteps) {
+                            console.log(`[MORPH] Fade in: ${Math.round(i / fadeSteps * 100)}% | Opacity: ${opacity.toFixed(2)}`);
+                        }
+
+                        await sleep(stepDuration);
+                    }
+
+                    previousBrainMap = currentBrainMap;
+                    currentBrainMap = newMapUrl;
+                }
+
+                // Ensure we're in 3D view
+                nv.setSliceType(nv.sliceTypeRender);
+                nv.drawScene();
+
+                console.log('[MORPH] Complete - Now showing:', currentBrainMap);
+                console.log('[MORPH] ==========================================');
+
+            } catch (error) {
+                console.error('[MORPH] Error during transition:', error);
+                // Fallback to direct load
+                await nv.loadVolumes([
+                    {
+                        url: '/mni152_t1_2mm.nii.gz',
+                        colormap: 'gray',
+                        opacity: 0.15,
+                        visible: true
+                    },
+                    {
+                        url: newMapUrl,
+                        colormap: 'hot',
+                        opacity: 0.9,
+                        visible: true
+                    }
+                ]);
+                currentBrainMap = newMapUrl;
+            } finally {
+                isTransitioning = false;
             }
         }
 
@@ -527,36 +672,9 @@
             document.getElementById('info-time').textContent = new Date(data.timestamp).toLocaleTimeString();
             brainInfoEl.style.display = 'block';
 
-            // Load new brain map
+            // Use morphing transition for brain map
             if (nv) {
-                try {
-                    // Load both brain template and new map
-                    const volumes = [
-                        {
-                            url: '/mni152_t1_2mm.nii.gz',
-                            colormap: 'gray',
-                            opacity: 0.15,
-                            visible: true
-                        },
-                        {
-                            url: data.map_file,
-                            colormap: 'hot',
-                            opacity: 0.9,
-                            visible: true
-                        }
-                    ];
-
-                    await nv.loadVolumes(volumes);
-
-                    // Ensure 3D view
-                    nv.setSliceType(nv.sliceTypeRender);
-                    nv.drawScene();
-
-                    currentBrainMap = data.map_file;
-                    console.log('Brain map loaded:', currentBrainMap);
-                } catch (e) {
-                    console.error('Error loading brain map:', e);
-                }
+                await morphBrainStates(data.map_file);
             }
 
             // Reset word count for next cycle

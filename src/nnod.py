@@ -456,7 +456,7 @@ def filter_fmris(*arrays, labels, meta_fmris):
     mask_label_checked = Y.sum(axis=1) != 0
     meta_fmris, *arrays, Y = mask_rows(mask_label_checked, meta_fmris, *arrays, Y)
 
-    # Remove maps from blacklist if present
+    # Remove brain_maps from blacklist if present
     mask_not_blacklisted = np.full(len(meta_fmris), True)
     blacklist = {"collection_id": [4343]}
     for blacklist_key in blacklist:

@@ -1,0 +1,185 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>3D brain + colorful blobs (tweakable)</title>
+  <style>
+    html, body { height:100%; }
+    body { margin:0; background:#111; color:#eee; font-family: system-ui, sans-serif; overflow:hidden; }
+    #controls { position: fixed; top: 8px; left: 8px; z-index: 10; background:#222; padding:10px; border-radius:8px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+    #gl { position: fixed; top:0; left:0; width:100vw; height:100vh; display:block; }
+    #log { position: fixed; right: 8px; bottom: 8px; width: 38vw; max-height: 40vh; overflow:auto; background:#000; color:#0f0;
+           font: 12px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; padding:8px; border:1px solid #333; border-radius:8px; opacity:0.9; }
+    label { display:inline-flex; align-items:center; gap:6px; }
+    button, select, input[type="range"] { cursor:pointer; }
+  </style>
+  <!-- Load NiiVue from visualization/static folder -->
+  <script src="visualization/static/niivue.umd.js"></script>
+</head>
+<body>
+  <div id="controls">
+    <button id="prev">Prev</button>
+    <button id="next">Next</button>
+
+    <label>T1 opacity
+      <input id="t1op" type="range" min="0" max="1" step="0.02" value="0.12">
+    </label>
+
+    <label>Overlay opacity
+      <input id="op" type="range" min="0" max="1" step="0.02" value="0.90">
+    </label>
+
+    <label>Colormap
+      <select id="cmap">
+        <option>turbo</option>
+        <option selected>plasma</option>
+        <option>viridis</option>
+        <option>magma</option>
+        <option>hot</option>
+        <option>spectrum</option>
+      </select>
+    </label>
+
+    <button id="angles">Cycle angle</button>
+    <button id="slices">Slices</button>
+    <button id="render3d">3D</button>
+    <button id="fit">Fit</button>
+    <label>Zoom
+      <input id="zoom" type="range" min="0.6" max="2.2" step="0.05" value="1.30">
+    </label>
+  </div>
+
+  <canvas id="gl"></canvas>
+  <pre id="log"></pre>
+
+  <script>
+    // ----- logger -----
+    const Log = document.getElementById('log');
+    const log = (...a) => { const s=a.map(x=>typeof x==='object'?JSON.stringify(x):String(x)).join(' ');
+      console.log(s); Log.textContent+=s+"\n"; Log.scrollTop=Log.scrollHeight; };
+    const die = (m,e) => { alert(m); log("FATAL", m, e?String(e):""); throw new Error(m); };
+
+    // NiiVue constructor (your build exposes lowercase namespace)
+    const NiivueCtor = window.niivue && window.niivue.Niivue;
+    if (!NiivueCtor) die("niivue.Niivue not found. Ensure visualization/static/niivue.umd.js exists.");
+
+    // Show colorbar
+    const nv = new NiivueCtor({ isWebGL2:true, backColor:[0,0,0,0], isColorbar:true });
+    nv.attachTo("gl");
+    log("NiiVue attached.");
+
+    function fitCanvas() {
+      try { nv.resizeListener(); } catch {}
+      try { nv.setPan(0, 0); } catch {}
+      const z = parseFloat(document.getElementById("zoom").value);
+      try { nv.setZoom(z); } catch {}
+      nv.drawScene();
+    }
+    window.addEventListener('resize', fitCanvas);
+
+    // state
+    let files = [], i = 0;
+    const angles = [
+      [120,  15],  // oblique
+      [ 90,   0],  // right
+      [270,   0],  // left
+      [180,   0],  // posterior
+      [  0,   0],  // anterior
+      [  0,  90],  // superior
+      [  0, -90],  // inferior
+    ];
+    let angleIdx = 0;
+
+    async function getIndex(){
+      log("Fetching index.json...");
+      const r = await fetch("index.json", { cache: "no-store" });
+      if (!r.ok) die("Failed to fetch index.json");
+      const j = await r.json();
+      // Support both 'files' array directly and 'metadata' with file paths
+      let arr = [];
+      if (Array.isArray(j.files)) {
+        arr = j.files.filter(s => typeof s === "string" && s.trim());
+      } else if (Array.isArray(j.metadata)) {
+        arr = j.metadata.map(m => m.file).filter(s => s);
+      }
+      log("index files:", arr);
+      if (!arr.length) die("index.json contains no usable file paths.");
+      return arr;
+    }
+
+    async function load(k){
+      i = (k + files.length) % files.length;
+      const blobUrl = files[i];
+      document.getElementById("log").textContent = ""; // clear log per load
+      log("Loading overlay:", blobUrl);
+
+      const t1op = parseFloat(document.getElementById("t1op").value);
+      const op   = parseFloat(document.getElementById("op").value);
+      const cmap = document.getElementById("cmap").value;
+
+      // Use the brain template from root directory
+      const payload = [
+        { url: "mni152_t1_2mm.nii.gz", volume: { name:"T1",   colormap:"gray",  opacity: Math.max(0, Math.min(1, t1op)), visible:true } },
+        { url: blobUrl,                 volume: { name:"blob", colormap:cmap,   opacity: Math.max(0, Math.min(1, op)),   visible:true } }
+      ];
+      log("payload:", payload);
+
+      await nv.loadVolumes(payload);
+
+      // 3D render by default
+      nv.setSliceType(nv.sliceTypeRender);
+      const [az, el] = angles[angleIdx];
+      nv.setRenderAzimuthElevation(az, el);
+      nv.drawScene();
+      fitCanvas();
+
+      // Show metadata if available
+      try {
+        const r = await fetch("index.json", { cache: "no-store" });
+        const j = await r.json();
+        if (j.metadata && j.metadata[i]) {
+          const meta = j.metadata[i];
+          log(`Text: ${meta.text_preview || meta.text || 'N/A'}`);
+          log(`Similarity: ${meta.similarity || 'N/A'}`);
+          log(`Index: ${meta.index || 'N/A'}`);
+          if (meta.timestamp) {
+            log(`Time: ${new Date(meta.timestamp).toLocaleString()}`);
+          }
+          if (j.session_id) {
+            log(`Session: ${j.session_id}`);
+          }
+        }
+      } catch(e) {
+        // metadata is optional
+      }
+    }
+
+    async function init(){
+      files = await getIndex();
+      await load(0);
+
+      // navigation
+      document.getElementById("prev").onclick   = () => load(i-1);
+      document.getElementById("next").onclick   = () => load(i+1);
+      document.getElementById("fit").onclick    = () => fitCanvas();
+      document.getElementById("slices").onclick = () => { nv.setSliceType(nv.sliceTypeAxial); nv.drawScene(); };
+      document.getElementById("render3d").onclick = () => { nv.setSliceType(nv.sliceTypeRender); nv.drawScene(); };
+
+      // live tweaks
+      document.getElementById("t1op").oninput = (e) => { const v=parseFloat(e.target.value); if (nv.volumes.length>0) { nv.setOpacity(0, v); nv.drawScene(); } };
+      document.getElementById("op").oninput   = (e) => { const v=parseFloat(e.target.value); if (nv.volumes.length>1) { nv.setOpacity(1, v); nv.drawScene(); } };
+      document.getElementById("cmap").onchange = () => load(i); // reload with new colormap
+      document.getElementById("zoom").oninput  = () => fitCanvas();
+      document.getElementById("angles").onclick = () => {
+        angleIdx = (angleIdx + 1) % angles.length;
+        const [az, el] = angles[angleIdx];
+        nv.setSliceType(nv.sliceTypeRender);
+        nv.setRenderAzimuthElevation(az, el);
+        nv.drawScene();
+      };
+    }
+
+    init();
+  </script>
+</body>
+</html>

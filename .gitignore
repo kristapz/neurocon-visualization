@@ -1,0 +1,21 @@
+# macOS system files
+.DS_Store
+
+# IDE/project settings
+.idea/
+
+# Virtual environments
+.venv/
+.venv310/
+
+# Python cache
+__pycache__/
+
+# Model checkpoints
+*.pt
+
+# Pickle files (all of them)
+*.pkl
+
+# Outputs
+/output/

@@ -2,6 +2,14 @@
 
 import os
 import sys
+import torch
+if torch.backends.mps.is_available():
+    device = "mps"
+else:
+    device = "cpu"
+print("Using device:", device)
+torch.set_default_dtype(torch.float32)
+
 
 # Get the current working directory
 current_folder_path = os.getcwd()
@@ -79,7 +87,7 @@ batch_size = 128
 lr = 1e-4
 weight_decay = 0.1
 dropout = 0.6
-num_epochs = 50
+num_epochs = 60
 output_size = preprocessed_test_gaussian_embeddings.shape[1]
 
 device = "cuda" if torch.cuda.is_available() else "cpu"

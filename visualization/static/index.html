@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speech to Brain Visualization</title>
+
+    <style>
+        /* Reset and base styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-gradient-start: #1a1a2e;
+            --bg-gradient-end: #16213e;
+            --panel-bg: rgba(255, 255, 255, 0.05);
+            --panel-border: rgba(255, 255, 255, 0.1);
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --accent-color: #00d9ff;
+            --success-color: #00ff88;
+            --warning-color: #ffaa00;
+            --error-color: #ff4444;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, var(--bg-gradient-start), var(--bg-gradient-end));
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Header */
+        header {
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--panel-border);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .header-title h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, var(--accent-color), var(--success-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: var(--panel-bg);
+            border-radius: 20px;
+            border: 1px solid var(--panel-border);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--error-color);
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.connected {
+            background: var(--success-color);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Main layout */
+        main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 1.5rem;
+            padding: 1.5rem;
+            overflow: hidden;
+        }
+
+        /* Panels */
+        .panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--panel-border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--panel-border);
+        }
+
+        .panel-title {
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .panel-content {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        /* Transcript panel */
+        #transcript-container {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 1rem;
+            min-height: 200px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: 1rem;
+        }
+
+        #transcript {
+            line-height: 1.6;
+            font-size: 1rem;
+            color: var(--text-secondary);
+        }
+
+        #transcript .sentence {
+            display: inline;
+            margin-right: 0.25em;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Words display */
+        #words-container {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 1rem;
+            max-height: 150px;
+            overflow-y: auto;
+            margin-bottom: 1rem;
+        }
+
+        .word {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            margin: 0.25rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            cursor: default;
+            transition: all 0.2s;
+        }
+
+        .word:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-1px);
+        }
+
+        /* Metrics */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .metric-item {
+            text-align: center;
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+        }
+
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 300;
+            color: var(--accent-color);
+        }
+
+        /* Audio level meter */
+        .audio-meter {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+
+        .audio-meter-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--success-color), var(--warning-color));
+            width: 0%;
+            transition: width 0.1s ease-out;
+        }
+
+        /* Brain viewer */
+        #brain-viewer-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            min-height: 500px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        #brain-canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .brain-loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top-color: var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        button {
+            padding: 0.5rem 1rem;
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            color: var(--text-primary);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--accent-color);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        /* Responsive design */
+        @media (max-width: 1024px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+
+            #brain-viewer-container {
+                min-height: 400px;
+            }
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+    </style>
+
+    <!-- NiiVue for brain visualization -->
+    <!-- Try loading from static directory first, with CDN fallback -->
+    <script src="/static/niivue.umd.js"
+            onerror="this.onerror=null; this.src='https://unpkg.com/@niivue/niivue@0.42.2/dist/niivue.umd.js'; console.log('Loading NiiVue from CDN')">
+    </script>
+</head>
+<body>
+    <header>
+        <div class="header-title">
+            <h1>🧠 Speech to Brain Visualization</h1>
+        </div>
+        <div class="status-indicator">
+            <div id="status-dot" class="status-dot"></div>
+            <span id="status-text">Disconnected</span>
+        </div>
+    </header>
+
+    <main>
+        <!-- Left panel: Transcription and metrics -->
+        <div class="panel">
+            <div class="panel-header">
+                <h2 class="panel-title">Live Transcription</h2>
+            </div>
+            <div class="panel-content">
+                <!-- Transcript display -->
+                <div id="transcript-container">
+                    <div id="transcript">Waiting for speech input...</div>
+                </div>
+
+                <!-- Word-level display -->
+                <div id="words-container">
+                    <div id="words"></div>
+                </div>
+
+                <!-- Metrics display -->
+                <div class="metrics-grid">
+                    <div class="metric-item">
+                        <div class="metric-label">Audio Level</div>
+                        <div class="metric-value" id="rms-value">0.000</div>
+                        <div class="audio-meter">
+                            <div id="audio-meter-fill" class="audio-meter-fill"></div>
+                        </div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">Words</div>
+                        <div class="metric-value" id="word-count">0</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">Similarity</div>
+                        <div class="metric-value" id="similarity">-</div>
+                    </div>
+                </div>
+
+                <!-- Controls -->
+                <div class="controls">
+                    <button id="clear-btn">Clear Text</button>
+                    <button id="export-btn">Export Data</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right panel: Brain visualization -->
+        <div class="panel">
+            <div class="panel-header">
+                <h2 class="panel-title">Brain Activation Map</h2>
+            </div>
+            <div class="panel-content">
+                <div id="brain-viewer-container">
+                    <canvas id="brain-canvas"></canvas>
+                    <div id="brain-loading" class="brain-loading">
+                        <div class="loading-spinner"></div>
+                        <p>Initializing brain viewer...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Application state
+        const app = {
+            ws: null,
+            nv: null,
+            fullText: '',
+            wordCount: 0,
+            brainMaps: [],
+            isConnected: false
+        };
+
+        // DOM elements
+        const elements = {
+            statusDot: document.getElementById('status-dot'),
+            statusText: document.getElementById('status-text'),
+            transcript: document.getElementById('transcript'),
+            words: document.getElementById('words'),
+            rmsValue: document.getElementById('rms-value'),
+            audioMeterFill: document.getElementById('audio-meter-fill'),
+            wordCount: document.getElementById('word-count'),
+            similarity: document.getElementById('similarity'),
+            brainLoading: document.getElementById('brain-loading'),
+            clearBtn: document.getElementById('clear-btn'),
+            exportBtn: document.getElementById('export-btn')
+        };
+
+        // Initialize brain viewer
+        async function initBrainViewer() {
+            try {
+                app.nv = new niivue.Niivue({
+                    backColor: [0, 0, 0, 0],
+                    show3Dcrosshair: false,
+                    sliceType: niivue.SLICE_TYPE.RENDER,
+                    meshThicknessOn2D: 5,
+                    isRadiologicalConvention: false
+                });
+
+                app.nv.attachToCanvas(document.getElementById('brain-canvas'));
+
+                // Load MNI template
+                await app.nv.loadVolumes([{
+                    url: '/static/mni152_t1_2mm.nii.gz',
+                    colormap: 'gray',
+                    opacity: 0.3,
+                    visible: true
+                }]);
+
+                // Set initial view
+                app.nv.setSliceType(app.nv.sliceTypeRender);
+                app.nv.setClipPlane([0, 0, 90]);
+
+                // Hide loading indicator
+                elements.brainLoading.style.display = 'none';
+
+                console.log('Brain viewer initialized');
+            } catch (error) {
+                console.error('Failed to initialize brain viewer:', error);
+                elements.brainLoading.innerHTML = '<p>Failed to load brain viewer</p>';
+            }
+        }
+
+        // WebSocket connection
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+            app.ws = new WebSocket(wsUrl);
+            app.ws.binaryType = 'arraybuffer';
+
+            app.ws.onopen = () => {
+                console.log('WebSocket connected');
+                app.isConnected = true;
+                updateConnectionStatus(true);
+                initBrainViewer();
+            };
+
+            app.ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                app.isConnected = false;
+                updateConnectionStatus(false);
+
+                // Attempt to reconnect after delay
+                setTimeout(connectWebSocket, 3000);
+            };
+
+            app.ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+
+            app.ws.onmessage = handleWebSocketMessage;
+        }
+
+        // Handle incoming WebSocket messages
+        async function handleWebSocketMessage(event) {
+            const data = JSON.parse(new TextDecoder().decode(event.data));
+
+            switch (data.kind) {
+                case 'transcription':
+                    handleTranscription(data);
+                    break;
+
+                case 'partial':
+                    handlePartialWords(data);
+                    break;
+
+                case 'final_sentence':
+                    handleFinalSentence(data);
+                    break;
+
+                case 'metrics':
+                    handleMetrics(data);
+                    break;
+
+                case 'brain_update':
+                    await handleBrainUpdate(data);
+                    break;
+
+                case 'status':
+                    handleStatus(data);
+                    break;
+
+                case 'error':
+                    handleError(data);
+                    break;
+
+                case 'ping':
+                    // Keep-alive ping
+                    break;
+
+                default:
+                    console.log('Unknown message type:', data.kind);
+            }
+        }
+
+        // Message handlers
+        function handleTranscription(data) {
+            if (data.text) {
+                app.fullText += (app.fullText ? ' ' : '') + data.text;
+                elements.transcript.textContent = app.fullText;
+                elements.transcript.scrollTop = elements.transcript.scrollHeight;
+
+                // Update word count
+                app.wordCount += data.text.split(' ').length;
+                elements.wordCount.textContent = app.wordCount;
+            }
+
+            if (data.words && data.words.length > 0) {
+                handlePartialWords({words: data.words});
+            }
+        }
+
+        function handlePartialWords(data) {
+            if (data.words) {
+                data.words.forEach(wordData => {
+                    const span = document.createElement('span');
+                    span.className = 'word';
+                    span.textContent = wordData.w || wordData.word;
+
+                    if (wordData.t0 !== undefined && wordData.t1 !== undefined) {
+                        span.title = `${wordData.t0.toFixed(2)}s - ${wordData.t1.toFixed(2)}s`;
+                    }
+
+                    elements.words.appendChild(span);
+                });
+
+                // Keep words container scrolled to bottom
+                elements.words.scrollTop = elements.words.scrollHeight;
+
+                // Limit number of displayed words
+                while (elements.words.children.length > 50) {
+                    elements.words.removeChild(elements.words.firstChild);
+                }
+            }
+        }
+
+        function handleFinalSentence(data) {
+            if (data.text) {
+                app.fullText += (app.fullText ? ' ' : '') + data.text;
+                elements.transcript.textContent = app.fullText;
+                elements.transcript.scrollTop = elements.transcript.scrollHeight;
+
+                // Add words if provided
+                if (data.words) {
+                    handlePartialWords({words: data.words});
+                }
+
+                // Update word count
+                const wordCount = data.text.split(' ').filter(w => w.length > 0).length;
+                app.wordCount += wordCount;
+                elements.wordCount.textContent = app.wordCount;
+            }
+        }
+
+        function handleMetrics(data) {
+            if (data.rms !== undefined) {
+                const rms = data.rms;
+                elements.rmsValue.textContent = rms.toFixed(3);
+
+                // Update audio meter (scale and clamp)
+                const meterWidth = Math.min(100, Math.max(0, rms * 500));
+                elements.audioMeterFill.style.width = `${meterWidth}%`;
+
+                // Change color based on level
+                if (rms > 0.1) {
+                    elements.audioMeterFill.style.background =
+                        'linear-gradient(90deg, #ffaa00, #ff4444)';
+                } else if (rms > 0.002) {
+                    elements.audioMeterFill.style.background =
+                        'linear-gradient(90deg, #00ff88, #ffaa00)';
+                } else {
+                    elements.audioMeterFill.style.background =
+                        'linear-gradient(90deg, #00ff88, #00d9ff)';
+                }
+            }
+        }
+
+        async function handleBrainUpdate(data) {
+            console.log('Brain update received:', data);
+
+            // Update similarity score
+            if (data.similarity !== undefined) {
+                elements.similarity.textContent = (data.similarity * 100).toFixed(1) + '%';
+            }
+
+            // Load new brain map if viewer is ready
+            if (app.nv && data.map_url) {
+                try {
+                    // Show loading state
+                    elements.brainLoading.style.display = 'flex';
+                    elements.brainLoading.innerHTML =
+                        '<div class="loading-spinner"></div><p>Loading brain map...</p>';
+
+                    // Load brain map as overlay
+                    const volumes = [
+                        {
+                            url: '/static/mni152_t1_2mm.nii.gz',
+                            colormap: 'gray',
+                            opacity: 0.3,
+                            visible: true
+                        },
+                        {
+                            url: data.map_url,
+                            colormap: 'warm',
+                            opacity: 0.8,
+                            cal_min: 0,
+                            cal_max: 1,
+                            visible: true
+                        }
+                    ];
+
+                    await app.nv.loadVolumes(volumes);
+
+                    // Store map reference
+                    app.brainMaps.push({
+                        url: data.map_url,
+                        similarity: data.similarity,
+                        context: data.context,
+                        timestamp: data.timestamp
+                    });
+
+                    // Hide loading state
+                    elements.brainLoading.style.display = 'none';
+
+                    console.log('Brain map loaded:', data.map_url);
+                } catch (error) {
+                    console.error('Failed to load brain map:', error);
+                    elements.brainLoading.innerHTML = '<p>Failed to load brain map</p>';
+                    setTimeout(() => {
+                        elements.brainLoading.style.display = 'none';
+                    }, 3000);
+                }
+            }
+        }
+
+        function handleStatus(data) {
+            console.log('Status:', data.message);
+        }
+
+        function handleError(data) {
+            console.error('Error:', data.message);
+        }
+
+        // Update connection status display
+        function updateConnectionStatus(connected) {
+            if (connected) {
+                elements.statusDot.classList.add('connected');
+                elements.statusText.textContent = 'Connected';
+            } else {
+                elements.statusDot.classList.remove('connected');
+                elements.statusText.textContent = 'Disconnected';
+            }
+        }
+
+        // Button handlers
+        elements.clearBtn.addEventListener('click', () => {
+            app.fullText = '';
+            app.wordCount = 0;
+            elements.transcript.textContent = 'Waiting for speech input...';
+            elements.words.innerHTML = '';
+            elements.wordCount.textContent = '0';
+        });
+
+        elements.exportBtn.addEventListener('click', () => {
+            const exportData = {
+                transcript: app.fullText,
+                wordCount: app.wordCount,
+                brainMaps: app.brainMaps,
+                timestamp: new Date().toISOString()
+            };
+
+            const blob = new Blob([JSON.stringify(exportData, null, 2)],
+                                 {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `speech-brain-data-${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+
+        // Initialize application
+        function init() {
+            console.log('Initializing Speech to Brain Visualization');
+            connectWebSocket();
+        }
+
+        // Start the application
+        init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+{
+  "files": [
+    "output/maps/brain_20250916_194033_940.nii.gz",
+    "output/maps/brain_20250916_194103_686.nii.gz",
+    "output/maps/brain_20250916_194113_500.nii.gz",
+    "output/maps/brain_20250916_194145_231.nii.gz"
+  ],
+  "metadata": [
+    {
+      "file": "output/maps/brain_20250916_194033_940.nii.gz",
+      "timestamp": "2025-09-16T19:40:33.940448",
+      "similarity": 0.21626123785972595,
+      "index": 601,
+      "text_preview": "Wisp Whisper, which is just the OpenAI model that does this. Alright, alright, mate, now it's running, now it's running, now it's running. So now speak beak, and it's gonna transcr-"
+    },
+    {
+      "file": "output/maps/brain_20250916_194103_686.nii.gz",
+      "timestamp": "2025-09-16T19:41:03.686809",
+      "similarity": 0.21320295333862305,
+      "index": 601,
+      "text_preview": "Transcribe it And then eventually, eventually it's gonna, gonna generate, what, what those, those How are you? I mean, I mean, say, say things, things that you are you are thinking about that would re"
+    },
+    {
+      "file": "output/maps/brain_20250916_194113_500.nii.gz",
+      "timestamp": "2025-09-16T19:41:13.500683",
+      "similarity": 0.20917105674743652,
+      "index": 601,
+      "text_preview": "let's say, I remember this or this or something like that. No, no, no, no, okay, well, okay, well, then, well, then, you already, already said it. said is how is how commit commit didn't didn't it it'"
+    },
+    {
+      "file": "output/maps/brain_20250916_194145_231.nii.gz",
+      "timestamp": "2025-09-16T19:41:45.231369",
+      "similarity": 0.21619567275047302,
+      "index": 601,
+      "text_preview": "what I was saying about it being slow. There it is. Now these are the brain regions. regions that corresponds to this. Look, look, look, look, look, look, look, look, look, look, look, look, look, loo"
+    }
+  ],
+  "session_id": "session_20250916_193939"
+}

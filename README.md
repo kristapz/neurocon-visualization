@@ -1,28 +1,25 @@
-Here's an updated README for your NeuroConText visualization project:
+Here's the updated README for Speech2Viz:
 
-```markdown
-# NeuroConText: Real-Time Speech-to-Brain Visualization
+# Speech2Viz: Real-Time Speech-to-Brain Visualization
 
-A real-time system that visualizes brain activation patterns from spoken language, built on the NeuroConText framework for contrastive text-to-brain mapping.
+A real-time system that visualizes brain activation patterns from spoken language using contrastive learning to map text to brain activity.
 
 ## Overview
 
-This system converts speech to 3D brain activation maps in real-time by:
+Speech2Viz converts speech to 3D brain activation maps in real-time by:
 1. Transcribing speech using OpenAI's Whisper
 2. Embedding text using language models (GPT-Neo)
 3. Mapping embeddings to brain activation patterns via contrastive learning
 4. Visualizing results as interactive 3D brain maps
 
-Based on the paper: [NeuroConText: Contrastive Text-to-Brain Mapping for Neuroscientific Literature (MICCAI 2024)](https://github.com/ghayem/NeuroConText)
-
 ## Features
 
-- 🎤 Real-time speech transcription with word-level timestamps
-- 🧠 Live 3D brain visualization with smooth morphing transitions
-- ⚡ Optimized for M1 Mac with Metal GPU acceleration
-- 💾 Intelligent caching for repeated phrases
-- 📊 DiFuMo-512 functional brain parcellation
-- 🔄 WebSocket-based streaming architecture
+- Real-time speech transcription with word-level timestamps
+- Live 3D brain visualization with smooth morphing transitions
+- Optimized for M1 Mac with Metal GPU acceleration
+- Intelligent caching for repeated phrases
+- DiFuMo-512 functional brain parcellation
+- WebSocket-based streaming architecture
 
 ## Prerequisites
 
@@ -37,14 +34,14 @@ Based on the paper: [NeuroConText: Contrastive Text-to-Brain Mapping for Neurosc
 
 ### 1. Clone Repository
 ```bash
-git clone https://github.com/kristapz/neurocon-visualization.git
-cd neurocon-visualization
+git clone https://github.com/kristapz/speech2viz.git
+cd speech2viz
 ```
 
 ### 2. Create Virtual Environment
 ```bash
 python3.10 -m venv .venv310
-source .venv310/bin/activate  # On Windows: .venv310\Scripts\activate
+source .venv310/bin/activate
 ```
 
 ### 3. Install Dependencies
@@ -56,9 +53,11 @@ pip install fastapi uvicorn websockets orjson sounddevice
 ```
 
 ### 4. Download Pre-trained Data
-Download the pre-trained embeddings (~8GB) from [Zenodo](https://zenodo.org/record/12789281) and save in the `data` folder:
-- `preprocessed_train_text_embeddings.pkl`
-- `preprocessed_train_gaussian_embeddings.pkl`
+Download the pre-trained embeddings (~8GB) from Zenodo and save in the data folder:
+- preprocessed_train_text_embeddings.pkl
+- preprocessed_train_gaussian_embeddings.pkl
+
+Download link: https://zenodo.org/record/12789281
 
 ## Usage
 
@@ -82,27 +81,23 @@ python texttobrain.py
 
 ## Configuration
 
-### Performance Settings (server_realtime.py)
+### Performance Settings
 
-```python
-# Audio processing
-UTTER_MS_MIN = 1000      # Min utterance length (ms)
-UTTER_MS_MAX = 5000      # Max utterance length (ms)
-SILENCE_MS_END = 400     # Silence threshold (ms)
-
-# Brain visualization  
-DIFUMO_SMOOTHING = 0.7   # Transition smoothing (0-1)
-MAX_CONCURRENT_EMBEDS = 3  # Parallel embedding limit
-```
+Edit server_realtime.py to adjust:
+- UTTER_MS_MIN = 1000 (minimum utterance length in ms)
+- UTTER_MS_MAX = 5000 (maximum utterance length in ms)
+- SILENCE_MS_END = 400 (silence threshold in ms)
+- DIFUMO_SMOOTHING = 0.7 (transition smoothing, 0-1)
+- MAX_CONCURRENT_EMBEDS = 3 (parallel embedding limit)
 
 ### Model Selection
 
 The system is optimized for M1 Macs using:
-- **Language Model**: GPT-Neo-125M (10x smaller than original, faster on M1)
-- **ASR Model**: Whisper tiny.en with int8 quantization
-- **Similarity Search**: NumPy-based (optimized for Apple Silicon)
+- Language Model: GPT-Neo-125M (10x smaller for better performance)
+- ASR Model: Whisper tiny.en with int8 quantization
+- Similarity Search: NumPy-based (optimized for Apple Silicon)
 
-To use a different language model, modify in `texttobrain.py`:
+To use a different language model, modify texttobrain.py line 66:
 ```python
 model_name = "EleutherAI/gpt-neo-125M"  # Options: 125M, 1.3B, 2.7B
 ```
@@ -110,30 +105,22 @@ model_name = "EleutherAI/gpt-neo-125M"  # Options: 125M, 1.3B, 2.7B
 ## Output Files
 
 Each session generates:
-
-```
-output/
-├── sessions/
-│   └── session_TIMESTAMP/
-│       ├── transcript.txt       # Full transcript
-│       ├── metadata.json        # Session metadata
-│       └── brain_*.nii.gz      # Brain maps
-└── maps/
-    └── brain_*.nii.gz          # All generated brain maps
-```
+- output/sessions/session_TIMESTAMP/transcript.txt (full transcript)
+- output/sessions/session_TIMESTAMP/metadata.json (session metadata)  
+- output/sessions/session_TIMESTAMP/brain_*.nii.gz (brain maps)
+- output/maps/brain_*.nii.gz (all generated brain maps)
 
 ## Architecture
 
-The system combines several key components:
-
-1. **Contrastive Model**: CLIP-style architecture mapping text to brain patterns
-2. **Training Data**: ~20K neuroscience articles with activation coordinates
-3. **DiFuMo Atlas**: Reduces brain volumes to 512 functional components
-4. **Streaming Pipeline**: Real-time audio → ASR → embedding → brain mapping
+Speech2Viz combines:
+1. Contrastive Model: CLIP-style architecture mapping text to brain patterns
+2. Training Data: ~20K neuroscience articles with activation coordinates
+3. DiFuMo Atlas: Reduces brain volumes to 512 functional components
+4. Streaming Pipeline: Real-time audio to ASR to embedding to brain mapping
 
 ### Key Optimizations for M1
 
-- Smaller GPT-Neo-125M model (vs 1.3B original)
+- Smaller GPT-Neo-125M model
 - NumPy-based similarity search (faster than PyTorch on M1)
 - Metal GPU acceleration where supported
 - Aggressive caching with pre-computed common phrases
@@ -141,54 +128,30 @@ The system combines several key components:
 
 ## Troubleshooting
 
-**No microphone input**: 
+No microphone input:
 ```bash
 python -m sounddevice  # List available devices
 ```
 
-**Slow performance**: 
+Slow performance:
 - Ensure you're using GPT-Neo-125M (not 1.3B)
 - Check that Metal acceleration is enabled
-- Reduce `MAX_CONCURRENT_EMBEDS` if needed
+- Reduce MAX_CONCURRENT_EMBEDS if needed
 
-**Missing data files**: 
-Download from [Zenodo](https://zenodo.org/record/12789281) and place in `data/` folder
+Missing data files:
+Download from https://zenodo.org/record/12789281 and place in data/ folder
 
-**MPS errors on M1**: 
+MPS errors on M1:
 The system will automatically fall back to CPU if Metal operations fail
 
 ## Citation
 
-If you use this system, please cite:
-
-```bibtex
-@inproceedings{ghayem2024neurocontext,
-  title={NeuroConText: Contrastive Text-to-Brain Mapping for Neuroscientific Literature},
-  author={Ghayem, Fateme and others},
-  booktitle={MICCAI},
-  year={2024}
-}
-```
+This work builds upon NeuroConText (Ghayem et al., MICCAI 2024).
 
 ## License
 
-This project extends the original NeuroConText work and is provided for research purposes. The original work was supported by:
-- KARAIB AI chair (ANR-20-CHIA-0025-01)
-- ANR-22-PESN-0012 France 2030 program
-- HORIZON-INFRA-2022-SERV-B-01 EBRAINS 2.0
+This project is provided for research purposes.
 
 ## Contact
 
-For questions about this visualization system: [your-email]
-
-For questions about the original NeuroConText: fateme[dot]ghayem[at]gmail[dot]com
-```
-
-This README:
-- Clearly explains what the system does
-- Highlights M1 optimizations
-- Provides clear installation and usage instructions
-- Documents the configuration options
-- Explains the architecture and optimizations
-- Includes troubleshooting tips
-- Properly credits the original work
+For questions: kristaps.zilgalvis@gmail.com

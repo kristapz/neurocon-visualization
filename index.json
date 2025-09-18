@@ -1,124 +1,25 @@
 {
   "files": [
-    "output/maps/brain_20250917_111228_514.nii.gz",
-    "output/maps/brain_20250917_111239_930.nii.gz",
-    "output/maps/brain_20250917_111250_913.nii.gz",
-    "output/maps/brain_20250917_111303_769.nii.gz",
-    "output/maps/brain_20250917_111316_515.nii.gz",
-    "output/maps/brain_20250917_111329_762.nii.gz",
-    "output/maps/brain_20250917_111341_819.nii.gz",
-    "output/maps/brain_20250917_111354_820.nii.gz",
-    "output/maps/brain_20250917_111408_787.nii.gz",
-    "output/maps/brain_20250917_111422_387.nii.gz",
-    "output/maps/brain_20250917_111435_337.nii.gz",
-    "output/maps/brain_20250917_111449_100.nii.gz",
-    "output/maps/brain_20250917_111504_858.nii.gz"
+    "output/maps/brain_20250918_151008_979.nii.gz",
+    "output/maps/brain_20250918_151013_732.nii.gz"
   ],
   "metadata": [
     {
-      "file": "output/maps/brain_20250917_111228_514.nii.gz",
-      "timestamp": "2025-09-17T11:12:28.514242",
-      "similarity": 0.2323138415813446,
-      "index": 601,
-      "text_preview": "Okay, show me the hip-icamp.",
-      "chunk_count": 2
-    },
-    {
-      "file": "output/maps/brain_20250917_111239_930.nii.gz",
-      "timestamp": "2025-09-17T11:12:39.930991",
-      "similarity": 0.2305361032485962,
-      "index": 601,
-      "text_preview": "hamper sauce and the amo and the amo and the look the look and the and and",
+      "file": "output/maps/brain_20250918_151008_979.nii.gz",
+      "timestamp": "2025-09-18T15:10:08.979234",
+      "similarity": 0.21092398464679718,
+      "index": 7750,
+      "text_preview": "No, no, no.",
       "chunk_count": 3
     },
     {
-      "file": "output/maps/brain_20250917_111250_913.nii.gz",
-      "timestamp": "2025-09-17T11:12:50.913470",
-      "similarity": 0.22296017408370972,
-      "index": 601,
-      "text_preview": "I'm talking about my...",
-      "chunk_count": 4
-    },
-    {
-      "file": "output/maps/brain_20250917_111303_769.nii.gz",
-      "timestamp": "2025-09-17T11:13:03.769746",
-      "similarity": 0.2152634710073471,
-      "index": 10753,
-      "text_preview": "positive and negative memory.",
-      "chunk_count": 5
-    },
-    {
-      "file": "output/maps/brain_20250917_111316_515.nii.gz",
-      "timestamp": "2025-09-17T11:13:16.515747",
-      "similarity": 0.22412553429603577,
-      "index": 601,
-      "text_preview": "my child well-pooed.",
-      "chunk_count": 6
-    },
-    {
-      "file": "output/maps/brain_20250917_111329_762.nii.gz",
-      "timestamp": "2025-09-17T11:13:29.762009",
-      "similarity": 0.23889902234077454,
-      "index": 601,
-      "text_preview": "I love my name and this means Christmas, Christmas, that's it.",
-      "chunk_count": 7
-    },
-    {
-      "file": "output/maps/brain_20250917_111341_819.nii.gz",
-      "timestamp": "2025-09-17T11:13:41.819695",
-      "similarity": 0.21524250507354736,
-      "index": 601,
-      "text_preview": "This isn't working, working on that. Whoa, whoa, whoa.",
-      "chunk_count": 8
-    },
-    {
-      "file": "output/maps/brain_20250917_111354_820.nii.gz",
-      "timestamp": "2025-09-17T11:13:54.820758",
-      "similarity": 0.246123805642128,
-      "index": 601,
-      "text_preview": "Thank you.",
-      "chunk_count": 9
-    },
-    {
-      "file": "output/maps/brain_20250917_111408_787.nii.gz",
-      "timestamp": "2025-09-17T11:14:08.787711",
-      "similarity": 0.2211793065071106,
-      "index": 601,
-      "text_preview": "Bye!",
-      "chunk_count": 10
-    },
-    {
-      "file": "output/maps/brain_20250917_111422_387.nii.gz",
-      "timestamp": "2025-09-17T11:14:22.387595",
-      "similarity": 0.23514004051685333,
-      "index": 601,
-      "text_preview": "Okay, keep, keep going, don't.",
-      "chunk_count": 11
-    },
-    {
-      "file": "output/maps/brain_20250917_111435_337.nii.gz",
-      "timestamp": "2025-09-17T11:14:35.337631",
-      "similarity": 0.23417866230010986,
-      "index": 601,
-      "text_preview": "Yes, yes.",
-      "chunk_count": 12
-    },
-    {
-      "file": "output/maps/brain_20250917_111449_100.nii.gz",
-      "timestamp": "2025-09-17T11:14:49.100645",
-      "similarity": 0.24760761857032776,
-      "index": 601,
-      "text_preview": "Thank you. Thank you. Thank you. Thank you.",
-      "chunk_count": 12
-    },
-    {
-      "file": "output/maps/brain_20250917_111504_858.nii.gz",
-      "timestamp": "2025-09-17T11:15:04.858425",
-      "similarity": 0.22999495267868042,
-      "index": 601,
-      "text_preview": "Now, now, show me more and more different brain regions.",
-      "chunk_count": 14
+      "file": "output/maps/brain_20250918_151013_732.nii.gz",
+      "timestamp": "2025-09-18T15:10:13.732335",
+      "similarity": 0.20630347728729248,
+      "index": 7750,
+      "text_preview": "show me the meat of the hippo-hippo camp campo sauce.",
+      "chunk_count": 3
     }
   ],
-  "session_id": "session_20250917_111145"
+  "session_id": "session_20250918_150916"
 }

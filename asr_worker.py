@@ -1,34 +1,24 @@
-# asr_worker.py - Optimized for speed
+# asr_worker.py - Optimized for M1 Mac
 from faster_whisper import WhisperModel
 import numpy as np
 from typing import Dict, Any, List, Tuple
 
+
 class StreamingASR:
     def __init__(self, model_size="tiny.en", device="auto", compute_type="int8"):
         """
-        Initialize Whisper model optimized for speed
-
-        Model sizes (speed vs accuracy tradeoff):
-        - tiny.en: ~39M, fastest, good enough for conversation
-        - base.en: ~74M, better accuracy, still fast
-        - small.en: ~244M, good balance
-        - medium.en: ~769M, high accuracy but slow
+        Initialize Whisper model optimized for M1 Mac
+        Force tiny model and int8 for best performance
         """
 
-        # Auto-detect CUDA availability
-        if device == "auto":
-            try:
-                import torch
-                if torch.cuda.is_available():
-                    device = "cuda"
-                    compute_type = "float16"  # Use fp16 on GPU
-                    print(f"[ASR] Using CUDA GPU acceleration")
-                else:
-                    device = "cpu"
-                    print(f"[ASR] Using CPU (no GPU detected)")
-            except ImportError:
-                device = "cpu"
-                print(f"[ASR] Using CPU (torch not available)")
+        # Force tiny model for M1
+        model_size = "tiny.en"
+
+        # M1 optimization: Use CPU with int8
+        # (Metal not yet supported by faster-whisper)
+        device = "cpu"
+        compute_type = "int8"
+        print(f"[ASR] Using {model_size} on CPU with int8 (optimized for M1)")
 
         # Load model
         self.model = WhisperModel(model_size, device=device, compute_type=compute_type)
@@ -50,19 +40,12 @@ class StreamingASR:
             log_prob_threshold=-1.0,
         )
 
-        print(f"[ASR] Loaded {model_size} model on {device} with {compute_type}")
+        print(f"[ASR] Loaded {model_size} model optimized for M1")
 
     def transcribe_window(self, audio: np.ndarray) -> Tuple[List[Dict[str, float]], str, float, float]:
         """
         Transcribe audio window with minimal latency
-
-        Returns:
-            words: List of word dictionaries with timestamps
-            text: Combined text string
-            t0: Start time
-            t1: End time
         """
-
         # Quick check for silence (avoid processing empty audio)
         if np.max(np.abs(audio)) < 0.001:
             return [], "", 0.0, 0.0
@@ -99,14 +82,3 @@ class StreamingASR:
         text = " ".join(text_parts).strip()
 
         return words, text, float(t0 or 0.0), float(t1 or 0.0)
-
-    def transcribe_batch(self, audio_batch: List[np.ndarray]) -> List[Tuple]:
-        """
-        Batch transcription for efficiency (if needed)
-        Note: faster-whisper doesn't natively support batching,
-        but we can process sequentially with shared model
-        """
-        results = []
-        for audio in audio_batch:
-            results.append(self.transcribe_window(audio))
-        return results

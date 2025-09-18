@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-server_realtime.py - Optimized with streaming embeddings and concurrency control
+server_realtime.py - Optimized for M1 Mac with streaming embeddings
 """
 
 import asyncio
@@ -34,23 +34,23 @@ from audio_stream import mic_chunker, rms_level
 from ws_protocol import msg_partial, msg_final_sentence, msg_metrics
 
 # ===== CONFIGURATION =====
-# ASR Settings - Optimized for speed
-UTTER_MS_MIN = 1000  # 1 second minimum (was 2.5)
-UTTER_MS_MAX = 5000  # 5 second max (was 8)
-SILENCE_RMS = 0.003  # Slightly higher threshold
-SILENCE_MS_END = 400  # 400ms silence (was 700)
+# ASR Settings - Optimized for M1
+UTTER_MS_MIN = 1000  # 1 second minimum
+UTTER_MS_MAX = 5000  # 5 second max
+SILENCE_RMS = 0.003
+SILENCE_MS_END = 400  # 400ms silence
 SR = 16000
 
 # Brain Processing Settings
-MIN_WORDS_PER_CHUNK = 0  # Embed everything, no minimum
-MIN_CHUNKS_FOR_BRAIN = 1  # Generate brain map after first chunk
-MAX_CHUNKS_FOR_BRAIN = 10  # Limit context window
-MAX_CONCURRENT_EMBEDS = 5  # Prevent overload
-EMBEDDING_CACHE_SIZE = 500  # Cache size limit
+MIN_WORDS_PER_CHUNK = 0
+MIN_CHUNKS_FOR_BRAIN = 1
+MAX_CHUNKS_FOR_BRAIN = 10
+MAX_CONCURRENT_EMBEDS = 3  # Reduced for M1
+EMBEDDING_CACHE_SIZE = 500
 
 # Smoothing Settings
-DIFUMO_SMOOTHING = 1.0  # 0.0 = no smoothing, 1.0 = maximum smoothing
-USE_SMOOTHING = True  # Enable/disable smooth transitions
+DIFUMO_SMOOTHING = 0.7
+USE_SMOOTHING = True
 
 # ===== CONCURRENCY CONTROL =====
 embedding_semaphore = Semaphore(MAX_CONCURRENT_EMBEDS)
@@ -81,17 +81,31 @@ def clean_repetitive_text(text: str, max_repeats: int = 3) -> str:
     return " ".join(cleaned)
 
 
-# ===== EXTENDED TextToBrainViz =====
+# ===== EXTENDED TextToBrainViz - M1 OPTIMIZED =====
 class OptimizedTextToBrainViz(TextToBrainViz):
-    """Extended version with caching and streaming support"""
+    """Extended version with M1-specific optimizations"""
 
     def __init__(self):
         super().__init__()
         self.embedding_cache = {}
         self.cache_hits = 0
         self.cache_misses = 0
-        self.running_coeffs = None  # For smooth transitions
-        self.smoothing_factor = 0.7  # Higher = smoother but less responsive
+        self.running_coeffs = None
+        self.smoothing_factor = 0.7
+
+        # Pre-compute numpy versions for faster similarity on M1
+        self.train_brain_latents_np = self.train_brain_latents.cpu().numpy()
+
+        # Pre-cache common phrases at startup
+        common_phrases = [
+            "hello", "thinking about", "I feel", "what if",
+            "let me", "I think", "actually", "basically",
+            "you know", "so", "um", "uh"
+        ]
+        print("[CACHE] Pre-computing common phrases...")
+        for phrase in common_phrases:
+            _ = self.text_to_embedding_cached(phrase)
+        print(f"[CACHE] Pre-cached {len(common_phrases)} phrases")
 
     def smooth_difumo_coefficients(self, new_coeffs):
         """Apply exponential moving average to coefficients for smooth transitions"""
@@ -127,22 +141,26 @@ class OptimizedTextToBrainViz(TextToBrainViz):
         return embedding
 
     def embedding_to_brain_map(self, embedding_4096, top_pct=0.15, use_smoothing=True):
-        """Generate brain map from pre-computed embedding with optional smoothing"""
+        """Generate brain map from pre-computed embedding - M1 optimized"""
         # Project to latent space
         with torch.no_grad():
             text_latent = self.model.encode_text(
                 torch.from_numpy(embedding_4096).float()
             )
 
-        # Find most similar brain pattern
-        similarities = torch.cosine_similarity(
-            text_latent,
-            self.train_brain_latents,
-            dim=1
-        )
+        # Use numpy for similarity computation (faster on M1)
+        text_latent_np = text_latent.cpu().numpy().squeeze()
 
-        best_idx = similarities.argmax().item()
-        best_score = similarities[best_idx].item()
+        # Normalize for cosine similarity
+        text_latent_np = text_latent_np / np.linalg.norm(text_latent_np)
+        train_norms = np.linalg.norm(self.train_brain_latents_np, axis=1, keepdims=True)
+        normalized_train = self.train_brain_latents_np / train_norms
+
+        # Compute similarities using numpy
+        similarities = np.dot(normalized_train, text_latent_np)
+
+        best_idx = similarities.argmax()
+        best_score = similarities[best_idx]
 
         # Get DiFuMo coefficients
         difumo_coeffs = self.train_gaussian_embeddings[best_idx]
@@ -151,13 +169,13 @@ class OptimizedTextToBrainViz(TextToBrainViz):
         if use_smoothing:
             difumo_coeffs = self.smooth_difumo_coefficients(difumo_coeffs)
 
-        # Reconstruct brain volume from smoothed coefficients
+        # Reconstruct brain volume from coefficients
         brain_img = self.masker.inverse_transform(difumo_coeffs.reshape(1, -1))
 
         # Apply threshold
         brain_img_sparse = self.top_percent_threshold(brain_img, top_pct=top_pct)
 
-        return brain_img_sparse, best_score, best_idx
+        return brain_img_sparse, float(best_score), int(best_idx)
 
 
 # ===== STREAMING ACCUMULATOR =====
@@ -205,7 +223,9 @@ class StreamingAccumulator:
             self.chunks_processed += 1
 
             print(
-                f"[EMBED] Chunk {self.chunks_processed}: {word_count} words (cache: {self.brain_processor.cache_hits}/{self.brain_processor.cache_misses})")
+                f"[EMBED] Chunk {self.chunks_processed}: {word_count} words "
+                f"(cache: {self.brain_processor.cache_hits}/{self.brain_processor.cache_misses})"
+            )
             return True
 
         except Exception as e:
@@ -217,7 +237,6 @@ class StreamingAccumulator:
 
     def should_generate_brain(self) -> bool:
         """Check if we have enough data for brain generation"""
-        # Generate brain map for EVERY chunk that has an embedding
         return len(self.chunk_embeddings) > 0
 
     def get_combined_embedding(self) -> Optional[np.ndarray]:
@@ -245,7 +264,6 @@ class StreamingAccumulator:
 
     def reset_for_next_brain(self):
         """Complete reset after brain generation"""
-        # Clear everything since we generate per chunk
         self.chunk_embeddings.clear()
         self.chunk_texts.clear()
         self.last_brain_time = asyncio.get_event_loop().time()
@@ -363,7 +381,7 @@ async def generate_brain_from_embedding(embedding: np.ndarray, context_text: str
             brain_processor.embedding_to_brain_map,
             embedding,
             0.15,
-            USE_SMOOTHING  # Enable smoothing
+            USE_SMOOTHING
         )
 
         # Save brain map
@@ -426,15 +444,15 @@ async def audio_processing_loop():
     current_session = create_session()
     print(f"[SESSION] Started: {current_session['id']}")
 
-    # Initialize optimized brain processor
-    print("[BRAIN] Initializing OptimizedTextToBrainViz...")
+    # Initialize M1-optimized brain processor
+    print("[BRAIN] Initializing OptimizedTextToBrainViz (M1 optimized)...")
     brain_processor = OptimizedTextToBrainViz()
-    brain_processor.smoothing_factor = DIFUMO_SMOOTHING  # Set smoothing level
-    print(f"[BRAIN] Ready! (Smoothing: {DIFUMO_SMOOTHING})")
+    brain_processor.smoothing_factor = DIFUMO_SMOOTHING
+    print(f"[BRAIN] Ready! (Smoothing: {DIFUMO_SMOOTHING}, Model: GPT-Neo-125M)")
 
-    print("[ASR] Initializing Whisper...")
-    # Use tiny model for speed
-    asr = StreamingASR(model_size="tiny.en", device="auto", compute_type="int8")
+    print("[ASR] Initializing Whisper (tiny model for M1)...")
+    # Force tiny model for M1 performance
+    asr = StreamingASR(model_size="tiny.en", device="cpu", compute_type="int8")
     print("[ASR] Ready!")
 
     # Streaming accumulator
@@ -512,6 +530,12 @@ async def audio_processing_loop():
             current_session["word_count"] += len(text.split())
             current_session["chunk_count"] += 1
 
+            # Save transcript periodically
+            if current_session["chunk_count"] % 10 == 0:
+                transcript_path = current_session["path"] / "transcript.txt"
+                with open(transcript_path, "w") as f:
+                    f.write("\n".join(current_session["transcript"]))
+
             # Stream embedding immediately
             embedded = await accumulator.add_chunk_async(text, loop)
 
@@ -520,7 +544,9 @@ async def audio_processing_loop():
                 await broadcast({
                     "kind": "embedding_status",
                     "chunks_embedded": accumulator.chunks_processed,
-                    "total_words": accumulator.total_words
+                    "total_words": accumulator.total_words,
+                    "cache_hits": brain_processor.cache_hits,
+                    "cache_misses": brain_processor.cache_misses
                 })
 
             # Check if should generate brain
@@ -550,18 +576,44 @@ async def startup():
     Path("output/maps").mkdir(parents=True, exist_ok=True)
     Path("output/sessions").mkdir(parents=True, exist_ok=True)
 
+    # Clean up old index.json if exists
+    if os.path.exists("index.json"):
+        os.remove("index.json")
+
     asyncio.create_task(audio_processing_loop())
     print("[SERVER] Ready at http://localhost:8001")
+    print("[SERVER] M1 optimizations enabled: GPT-Neo-125M, numpy similarity, int8 Whisper")
 
 
 # ===== CLEANUP =====
 @app.on_event("shutdown")
 async def shutdown():
-    """Clean up pending tasks"""
+    """Clean up pending tasks and save session"""
     # Cancel pending embedding tasks
     for task in embedding_tasks:
         if not task.done():
             task.cancel()
+
+    # Save final session data
+    if current_session:
+        session_path = current_session["path"]
+
+        # Save final transcript
+        transcript_path = session_path / "transcript.txt"
+        with open(transcript_path, "w") as f:
+            f.write("\n".join(current_session["transcript"]))
+
+        # Save metadata
+        metadata_path = session_path / "metadata.json"
+        with open(metadata_path, "w") as f:
+            json.dump({
+                "id": current_session["id"],
+                "start_time": current_session["start_time"],
+                "end_time": datetime.now().isoformat(),
+                "word_count": current_session["word_count"],
+                "chunk_count": current_session["chunk_count"],
+                "brain_maps_generated": len(current_session["brain_maps"])
+            }, f, indent=2)
 
     print(f"[SERVER] Shutdown complete")
 

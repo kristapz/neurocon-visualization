@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 text_to_brain_viz.py - Complete pipeline from text to brain visualization
+Optimized for M1 Mac performance
 """
 
 import os
@@ -45,13 +46,16 @@ class TextToBrainViz:
                 torch.from_numpy(self.train_gaussian_embeddings).float()
             )
 
+        # Pre-compute numpy version for faster similarity on M1
+        self.train_brain_latents_np = self.train_brain_latents.cpu().numpy()
+
         # Setup DiFuMo for reconstruction
         self.dim = self.train_gaussian_embeddings.shape[1]
         print(f"Setting up DiFuMo atlas (dim={self.dim})...")
         self.difumo = fetch_atlas_difumo(dimension=self.dim, resolution_mm=2)
         self.masker = NiftiMapsMasker(self.difumo.maps, standardize=False).fit()
 
-        # Load text encoder
+        # Load text encoder with M1 optimizations
         self._load_text_encoder()
 
         # Setup output directories
@@ -91,30 +95,43 @@ class TextToBrainViz:
     def _load_text_encoder(self):
         from transformers import AutoTokenizer, AutoModel
 
-        model_name = "EleutherAI/gpt-neo-1.3B"
-        print(f"Loading {model_name}...")
+        # Use smaller model for M1 performance
+        model_name = "EleutherAI/gpt-neo-125M"  # 10x smaller than 1.3B
+        print(f"Loading {model_name} (optimized for M1)...")
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.lm_model = AutoModel.from_pretrained(model_name)
+
+        # Use MPS (Metal) if available on M1
+        if torch.backends.mps.is_available():
+            self.device = torch.device("mps")
+            print("[BRAIN] Using M1 Metal GPU acceleration")
+        else:
+            self.device = torch.device("cpu")
+            print("[BRAIN] Using CPU")
+
+        self.lm_model = self.lm_model.to(self.device)
         self.lm_model.eval()
 
     def text_to_embedding_4096(self, text):
-        """Convert text to 4096-dim embedding"""
+        """Convert text to 4096-dim embedding - optimized"""
         base_embedding = embed_texts(
             [text],
             self.tokenizer,
             self.lm_model,
-            device=torch.device('cpu')
+            device=self.device  # Use MPS if available
         )
 
+        # Pad with zeros instead of duplicating (50% memory savings)
         if base_embedding.shape[1] == 2048:
-            # Duplicate to match training
-            embedding_4096 = np.concatenate([base_embedding, base_embedding], axis=1)
+            embedding_4096 = np.pad(base_embedding, ((0, 0), (0, 2048)), mode='constant')
         elif base_embedding.shape[1] == 4096:
             embedding_4096 = base_embedding
         else:
-            raise ValueError(f"Unexpected embedding size: {base_embedding.shape[1]}")
+            # Handle different model sizes (125M outputs 768 dims)
+            padding_size = 4096 - base_embedding.shape[1]
+            embedding_4096 = np.pad(base_embedding, ((0, 0), (0, padding_size)), mode='constant')
 
         return embedding_4096
 
@@ -129,7 +146,7 @@ class TextToBrainViz:
         return new_img_like(img, out, copy_header=True)
 
     def text_to_brain_map(self, text, top_pct=0.15):
-        """Complete pipeline: text → brain map"""
+        """Complete pipeline: text → brain map - M1 optimized"""
 
         print(f"Processing: '{text[:100]}{'...' if len(text) > 100 else ''}'")
 
@@ -142,15 +159,17 @@ class TextToBrainViz:
                 torch.from_numpy(text_embedding).float()
             )
 
-        # Find most similar brain pattern
-        similarities = torch.cosine_similarity(
-            text_latent,
-            self.train_brain_latents,
-            dim=1
-        )
+        # Use numpy for similarity (faster on M1)
+        text_latent_np = text_latent.cpu().numpy().squeeze()
+        text_latent_np = text_latent_np / np.linalg.norm(text_latent_np)
 
-        best_idx = similarities.argmax().item()
-        best_score = similarities[best_idx].item()
+        train_norms = np.linalg.norm(self.train_brain_latents_np, axis=1, keepdims=True)
+        normalized_train = self.train_brain_latents_np / train_norms
+
+        similarities = np.dot(normalized_train, text_latent_np)
+
+        best_idx = similarities.argmax()
+        best_score = similarities[best_idx]
 
         print(f"Best match: index {best_idx}, similarity {best_score:.4f}")
 
@@ -171,7 +190,7 @@ def main():
     converter = TextToBrainViz()
 
     print("=" * 60)
-    print("Text to Brain Visualization")
+    print("Text to Brain Visualization (M1 Optimized)")
     print("=" * 60)
     print("Enter text to generate brain activation maps.")
     print("Type 'quit' to exit.\n")

@@ -11,14 +11,39 @@ def mean_pooling(token_embeddings, attention_mask):
 
 def embed(input_ids, attention_mask, model, device=torch.device("cpu")):
     with torch.no_grad():
-        input_ids = input_ids.to(device)
-        attention_mask = attention_mask.to(device)
+        # Handle MPS backend properly for M1
+        if device.type == "mps":
+            # MPS requires specific handling
+            input_ids = input_ids.to(device)
+            attention_mask = attention_mask.to(device)
 
-        out = model(
-            input_ids,
-            attention_mask=attention_mask,
-            output_hidden_states=True,
-        )
+            # Ensure we don't hit MPS limitations
+            try:
+                out = model(
+                    input_ids,
+                    attention_mask=attention_mask,
+                    output_hidden_states=True,
+                )
+            except Exception as e:
+                print(f"[MPS] Falling back to CPU: {e}")
+                device = torch.device("cpu")
+                model = model.to(device)
+                input_ids = input_ids.to(device)
+                attention_mask = attention_mask.to(device)
+                out = model(
+                    input_ids,
+                    attention_mask=attention_mask,
+                    output_hidden_states=True,
+                )
+        else:
+            input_ids = input_ids.to(device)
+            attention_mask = attention_mask.to(device)
+            out = model(
+                input_ids,
+                attention_mask=attention_mask,
+                output_hidden_states=True,
+            )
+
         # Perform pooling
         text_embeddings = mean_pooling(out.hidden_states[-1], attention_mask)
 
@@ -26,9 +51,7 @@ def embed(input_ids, attention_mask, model, device=torch.device("cpu")):
         text_embeddings = F.normalize(text_embeddings, p=2, dim=1)
 
     text_embeddings = text_embeddings.cpu()
-
     return text_embeddings.numpy()
-
 
 def embed_texts(texts, tokenizer, model, device=torch.device("cpu")):
     tokenized = tokenizer(
